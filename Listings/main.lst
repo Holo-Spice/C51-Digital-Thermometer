@@ -1,0 +1,192 @@
+C51 COMPILER V9.60.0.0   MAIN                                                              12/27/2024 16:09:16 PAGE 1   
+
+
+C51 COMPILER V9.60.0.0, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN .\Objects\main.obj
+COMPILER INVOKED BY: E:\Keil5\C51\BIN\C51.EXE main.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRINT(.\Listings\main.l
+                    -st) TABS(2) OBJECT(.\Objects\main.obj)
+
+line level    source
+
+   1          #include "AT24C02.h"
+   2          #include "DS1302.h"
+   3          #include "DS18B20.h"
+   4          #include "Delay.h"
+   5          #include "Key.h"
+   6          // #include "LCD1602.h"
+   7          #include "Timer0.h"
+   8          #include <REGX52.H>
+   9          // #include "public.h"
+  10          #include "lcd12864.h"
+  11          
+  12          sbit BEEP = P2 ^ 5; // 定义蜂鸣器连接的引脚
+  13          unsigned char time;
+  14          float T, TShow;
+  15          char TLow, THigh;
+  16          unsigned char KeyNum;
+  17          
+  18          void Beep_Alert(unsigned int duration) // 蜂鸣器报警函数
+  19          {
+  20   1          unsigned int i;
+  21   1          for (i = 0; i < duration; i++) {
+  22   2              BEEP = !BEEP;   // 翻转蜂鸣器引脚
+  23   2              delay_10us(10); // 延时控制频率
+  24   2          }
+  25   1          BEEP = 0; // 关闭蜂鸣器
+  26   1      }
+  27          
+  28          void main() {
+  29   1          long F;
+  30   1          unsigned int FInt;  // 整数部分
+  31   1          unsigned int FFrac; // 小数部分
+  32   1          int start_time;
+  33   1          DS1302_Init();
+  34   1          DS1302_SetTime(); // 设置时间
+  35   1          start_time = 0;
+  36   1          lcd12864_init(); // LCD12864初始化
+  37   1      
+  38   1          lcd12864_show_string(1, 0, "数\xfd显温度计");
+  39   1          lcd12864_show_string(1, 1, "2021217934"); // 第4行字符串显示
+  40   1          while (start_time < 3000)                 // 执行3秒
+  41   1          {
+  42   2              DS1302_ReadTime(); // 读取时间
+  43   2              lcd12864_show_string(0, 2, "TIME:");
+  44   2              LCD_ShowNum(4, 6, DS1302_Time[3], 2); // 显示时
+  45   2              lcd12864_show_string(4, 2, ":");
+  46   2              LCD_ShowNum(4, 9, DS1302_Time[4], 2); // 显示分
+  47   2              lcd12864_show_string(6, 2, ":");
+  48   2              LCD_ShowNum(4, 12, DS1302_Time[5], 2); // 显示秒
+  49   2              delay_ms(100);                         // 每次延时100ms
+  50   2              start_time += 100;                     // 增加计时器
+  51   2          }
+  52   1          lcd12864_init(); // LCD12864初始化
+  53   1          delay_ms(1000);
+  54   1          lcd12864_show_string(0, 2, "TH:");
+C51 COMPILER V9.60.0.0   MAIN                                                              12/27/2024 16:09:16 PAGE 2   
+
+  55   1          lcd12864_show_string(4, 2, "TL:");
+  56   1          DS1302_deInit();
+  57   1          
+  58   1          DS18B20_ConvertT();          // 上电先转换一次温度，防止第一次读数据错误
+  59   1          delay_ms(1000);               // 等待转换完成
+  60   1          THigh = AT24C02_ReadByte(0); // 读取温度阈值数据
+  61   1          TLow = AT24C02_ReadByte(1);
+  62   1          if (THigh > 100 || TLow < -10 || THigh <= TLow) {
+  63   2              THigh = 20; // 如果阈值非法，则设为默认值
+  64   2              TLow = 15;
+  65   2          }
+  66   1      
+  67   1          LCD_ShowSignedNum(2, 11, THigh, 2);
+  68   1          LCD_ShowSignedNum(2, 15, TLow, 2);
+  69   1          Timer0_Init();
+  70   1          while (1) {
+  71   2              KeyNum = Key();
+  72   2              /* 温度读取及显示 */
+  73   2              DS18B20_ConvertT();  // 转换温度
+  74   2              T = DS18B20_ReadT(); // 读取温度
+  75   2              if (T < 0)           // 如果温度小于0
+  76   2              {
+  77   3                  LCD_ShowChar(1, 1, '-'); // 显示负号
+  78   3                  TShow = -T;              // 将温度变为正数
+  79   3              } else                       // 如果温度大于等于0
+  80   2              {
+  81   3                  LCD_ShowChar(1, 1, '+'); // 显示正号
+  82   3                  TShow = T;
+  83   3              }
+  84   2              LCD_ShowNum(1, 2, TShow, 2);                              // 显示温度整数部分
+  85   2              LCD_ShowChar(1, 3, '.');                                  // 显示小数点
+  86   2              LCD_ShowNum(1, 4, (unsigned long)(TShow * 100) % 100, 2); // 显示温度小数部分
+  87   2      
+  88   2              // 计算华氏温度
+  89   2              F = (long)T * 18 / 10 + 32;
+  90   2              FInt = (unsigned int)(F);        // 整数部分
+  91   2              FFrac = (unsigned int)(F % 100); // 小数部分
+  92   2      
+  93   2              LCD_ShowNum(1, 6, FInt, 2);                                     // 显示华氏温度整数部分
+  94   2              LCD_ShowChar(1, 7, '.');                                        // 显示小数点
+  95   2              LCD_ShowNum(1, 8, (unsigned long)(T * 100) % 100 * 18 / 10, 2); // 显示华氏温度小数部分
+  96   2              /* 阈值判断及显示 */
+  97   2              if (KeyNum) {
+  98   3                  if (KeyNum == 1) // K1按键，THigh自增
+  99   3                  {
+ 100   4                      THigh++;
+ 101   4                      if (THigh > 100) {
+ 102   5                          THigh = 100;
+ 103   5                      }
+ 104   4                  }
+ 105   3                  if (KeyNum == 2) // K2按键，THigh自减
+ 106   3                  {
+ 107   4                      THigh--;
+ 108   4                      if (THigh <= TLow) {
+ 109   5                          THigh++;
+ 110   5                      }
+ 111   4                  }
+ 112   3                  if (KeyNum == 3) // K3按键，TLow自增
+ 113   3                  {
+ 114   4                      lcd12864_init(); // LCD12864初始化
+ 115   4                      TLow++;
+ 116   4                      if (TLow >= THigh) {
+C51 COMPILER V9.60.0.0   MAIN                                                              12/27/2024 16:09:16 PAGE 3   
+
+ 117   5                          TLow--;
+ 118   5                      }
+ 119   4                  }
+ 120   3                  if (KeyNum == 4) // K4按键，TLow自减
+ 121   3                  {
+ 122   4                      TLow--;
+ 123   4                      if (TLow < -10) {
+ 124   5                          TLow = -10;
+ 125   5                      }
+ 126   4                  }
+ 127   3                  lcd12864_show_string(0, 2, "TH:");
+ 128   3                  lcd12864_show_string(4, 2, "TL:");
+ 129   3                  LCD_ShowSignedNum(2, 11, THigh, 2);
+ 130   3                  LCD_ShowSignedNum(2, 15, TLow, 2);
+ 131   3                  AT24C02_WriteByte(0, THigh); // 写入到At24C02中保存
+ 132   3                  delay_ms(5);
+ 133   3                  AT24C02_WriteByte(1, TLow);
+ 134   3                  delay_ms(5);
+ 135   3              }
+ 136   2              lcd12864_show_string(0, 2, "TH:");
+ 137   2              lcd12864_show_string(4, 2, "TL:");
+ 138   2              LCD_ShowSignedNum(2, 11, THigh, 2);
+ 139   2              LCD_ShowSignedNum(2, 15, TLow, 2);
+ 140   2              if (T > THigh) // 温度越高
+ 141   2              {
+ 142   3                  // LCD_ShowString(1, 13, "OV:H");
+ 143   3                  Beep_Alert(1000); // 蜂鸣器报警
+ 144   3              } else if (T < TLow)  // 温度越低
+ 145   2              {
+ 146   3                  // LCD_ShowString(1, 13, "OV:L");
+ 147   3                  Beep_Alert(1000); // 蜂鸣器报警
+ 148   3              } else {
+ 149   3                  // LCD_ShowString(1, 13, "    "); // 清除报警显示
+ 150   3                  BEEP = 0; // 关闭蜂鸣器
+ 151   3              }
+ 152   2          }
+ 153   1      }
+ 154          
+ 155          void Timer0_Routine() interrupt 1 {
+ 156   1          static unsigned int T0Count;
+ 157   1          TL0 = 0x18; // 设置定时初值
+ 158   1          TH0 = 0xFC; // 设置定时初值
+ 159   1          T0Count++;
+ 160   1          if (T0Count >= 20) {
+ 161   2              T0Count = 0;
+ 162   2              Key_Loop(); // 每20ms调用一次按键驱动函数
+ 163   2          }
+ 164   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1107    ----
+   CONSTANT SIZE    =     38    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     14      14
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
