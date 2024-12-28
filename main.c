@@ -1,31 +1,47 @@
-#include "AT24C02.h"
-#include "DS1302.h"
-#include "DS18B20.h"
-#include "Delay.h"
-#include "Key.h"
-// #include "LCD1602.h"
-#include "Timer0.h"
-#include <REGX52.H>
-// #include "public.h"
-#include "lcd12864.h"
+#include "AT24C02.h"      // AT24C02 EEPROM相关函数库
+#include "DS1302.h"       // DS1302 RTC相关函数库
+#include "DS18B20.h"      // DS18B20温度传感器相关函数库
+#include "Delay.h"        // 延时函数库
+#include "Key.h"          // 按键处理函数库
+//#include "LCD1602.h"     // LCD1602显示屏相关库
+#include "Timer0.h"       // 定时器0相关函数库
+#include <REGX52.H>       // 51单片机寄存器定义
+//#include "public.h"      // 公共函数库
+#include "lcd12864.h"     // LCD12864显示屏相关库
 
-sbit BEEP = P2 ^ 5; // 定义蜂鸣器连接的引脚
-unsigned char time;
-float T, TShow;
-char TLow, THigh;
-int i,j;
-unsigned char KeyNum;
+// 定义蜂鸣器连接的引脚
+sbit BEEP = P2 ^ 5;
+
+// 温度变量
+unsigned char time;      // 时间变量
+float T, TShow;          // 温度值和显示温度
+char TLow, THigh;        // 温度阈值（低阈值和高阈值）
+int i, j;                // 循环计数器
+unsigned char KeyNum;    // 按键编号
+
+// 最大温度记录数
 #define MAX_TEMP_RECORDS 5
+
+// GPIO引脚定义
 #define GPIO_DIG P0
 #define GPIO_KEY P1
-u8 KeyValue;	//用来存放读取到的键值
-u8 code smgduan[17]={0xc0,0xf9,0xa4,0xb0,0x99,0x92,0x82,0xf8,
-					0x80,0x90,0x88,0x83,0xc6,0xa1,0x86,0x8e};//显示0~F的值
-u8 KeyValue = 0xFF;  // 初始化为0xFF表示无按键
+
+// 按键值存储变量
+u8 KeyValue;            // 用来存放读取到的键值
+
+// 数码管显示0~F的值
+u8 code smgduan[17] = {
+    0xc0, 0xf9, 0xa4, 0xb0, 0x99, 0x92, 0x82, 0xf8,
+    0x80, 0x90, 0x88, 0x83, 0xc6, 0xa1, 0x86, 0x8e
+};
+
+// 初始化时，按键值默认为0xFF，表示无按键
+u8 KeyValue = 0xFF;
 
 // 新增温度存储相关变量
 float TempRecords[MAX_TEMP_RECORDS];  // 温度记录数组
 unsigned char TempCount = 0;          // 当前存储的温度数量
+
 /*******************************************************************************
 * 函 数 名         : KeyDown
 * 函数功能		   : 检测有按键按下并读取键值
@@ -201,8 +217,9 @@ void main() {
 							KeyValue = 0xFF;  // 清除按键值
 						}else{
 							lcd12864_init();
-							lcd12864_show_string(0, 1, "Storage Full!");
+							lcd12864_show_string(0, 1, "Full!");
 							delay_ms(1000);
+							TempCount = 0;
 							lcd12864_init();
 							KeyValue = 0xFF;  // 清除按键值
 						}

@@ -1865,9 +1865,9 @@
       <ActiveTab>0</ActiveTab>
       <Doc>
         <Name>.\main.c</Name>
-        <ColumnNumber>13</ColumnNumber>
-        <TopLine>222</TopLine>
-        <CurrentLine>236</CurrentLine>
+        <ColumnNumber>19</ColumnNumber>
+        <TopLine>1</TopLine>
+        <CurrentLine>27</CurrentLine>
         <Folding>1</Folding>
         <ContractedFolders></ContractedFolders>
         <PaneID>0</PaneID>
@@ -1900,7 +1900,7 @@
         <PaneID>0</PaneID>
       </Doc>
       <Doc>
-        <Name>D:\作业\单片机系统课设\C51-Digital-Thermometer\DS18B20.h</Name>
+        <Name>DS18B20.h</Name>
         <ColumnNumber>0</ColumnNumber>
         <TopLine>1</TopLine>
         <CurrentLine>8</CurrentLine>
@@ -1972,7 +1972,7 @@
         <PaneID>0</PaneID>
       </Doc>
       <Doc>
-        <Name>D:\作业\单片机系统课设\C51-Digital-Thermometer\AT24C02.h</Name>
+        <Name>AT24C02.h</Name>
         <ColumnNumber>0</ColumnNumber>
         <TopLine>1</TopLine>
         <CurrentLine>1</CurrentLine>
