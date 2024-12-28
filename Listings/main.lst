@@ -1,4 +1,4 @@
-C51 COMPILER V9.60.0.0   MAIN                                                              12/27/2024 16:09:16 PAGE 1   
+C51 COMPILER V9.60.0.0   MAIN                                                              12/28/2024 11:59:12 PAGE 1   
 
 
 C51 COMPILER V9.60.0.0, COMPILATION OF MODULE MAIN
@@ -23,167 +23,291 @@ line level    source
   13          unsigned char time;
   14          float T, TShow;
   15          char TLow, THigh;
-  16          unsigned char KeyNum;
-  17          
-  18          void Beep_Alert(unsigned int duration) // 蜂鸣器报警函数
-  19          {
-  20   1          unsigned int i;
-  21   1          for (i = 0; i < duration; i++) {
-  22   2              BEEP = !BEEP;   // 翻转蜂鸣器引脚
-  23   2              delay_10us(10); // 延时控制频率
-  24   2          }
-  25   1          BEEP = 0; // 关闭蜂鸣器
-  26   1      }
-  27          
-  28          void main() {
-  29   1          long F;
-  30   1          unsigned int FInt;  // 整数部分
-  31   1          unsigned int FFrac; // 小数部分
-  32   1          int start_time;
-  33   1          DS1302_Init();
-  34   1          DS1302_SetTime(); // 设置时间
-  35   1          start_time = 0;
-  36   1          lcd12864_init(); // LCD12864初始化
-  37   1      
-  38   1          lcd12864_show_string(1, 0, "数\xfd显温度计");
-  39   1          lcd12864_show_string(1, 1, "2021217934"); // 第4行字符串显示
-  40   1          while (start_time < 3000)                 // 执行3秒
-  41   1          {
-  42   2              DS1302_ReadTime(); // 读取时间
-  43   2              lcd12864_show_string(0, 2, "TIME:");
-  44   2              LCD_ShowNum(4, 6, DS1302_Time[3], 2); // 显示时
-  45   2              lcd12864_show_string(4, 2, ":");
-  46   2              LCD_ShowNum(4, 9, DS1302_Time[4], 2); // 显示分
-  47   2              lcd12864_show_string(6, 2, ":");
-  48   2              LCD_ShowNum(4, 12, DS1302_Time[5], 2); // 显示秒
-  49   2              delay_ms(100);                         // 每次延时100ms
-  50   2              start_time += 100;                     // 增加计时器
-  51   2          }
-  52   1          lcd12864_init(); // LCD12864初始化
-  53   1          delay_ms(1000);
-  54   1          lcd12864_show_string(0, 2, "TH:");
-C51 COMPILER V9.60.0.0   MAIN                                                              12/27/2024 16:09:16 PAGE 2   
+  16          int i,j;
+  17          unsigned char KeyNum;
+  18          #define MAX_TEMP_RECORDS 5
+  19          #define GPIO_DIG P0
+  20          #define GPIO_KEY P1
+  21          u8 KeyValue;  //用来存放读取到的键值
+  22          u8 code smgduan[17]={0xc0,0xf9,0xa4,0xb0,0x99,0x92,0x82,0xf8,
+  23                    0x80,0x90,0x88,0x83,0xc6,0xa1,0x86,0x8e};//显示0~F的值
+  24          u8 KeyValue = 0xFF;  // 初始化为0xFF表示无按键
+  25          
+  26          // 新增温度存储相关变量
+  27          float TempRecords[MAX_TEMP_RECORDS];  // 温度记录数组
+  28          unsigned char TempCount = 0;          // 当前存储的温度数量
+  29          /*******************************************************************************
+  30          * 函 数 名         : KeyDown
+  31          * 函数功能       : 检测有按键按下并读取键值
+  32          * 输    入         : 无
+  33          * 输    出         : 无
+  34          *******************************************************************************/
+  35          void KeyDown(void)
+  36          {
+  37   1        char a=0;
+  38   1        GPIO_KEY=0x0f;
+  39   1        if(GPIO_KEY!=0x0f)//读取按键是否按下
+  40   1        {
+  41   2          delay(1000);//延时10ms进行消抖
+  42   2          if(GPIO_KEY!=0x0f)//再次检测键盘是否按下
+  43   2          { 
+  44   3            //测试列
+  45   3            GPIO_KEY=0X0F;
+  46   3            switch(GPIO_KEY)
+  47   3            {
+  48   4              case(0X07): KeyValue=0;break;
+  49   4              case(0X0b): KeyValue=1;break;
+  50   4              case(0X0d): KeyValue=2;break;
+  51   4              case(0X0e): KeyValue=3;break;
+  52   4            }
+  53   3            //测试行
+  54   3            GPIO_KEY=0XF0;
+C51 COMPILER V9.60.0.0   MAIN                                                              12/28/2024 11:59:12 PAGE 2   
 
-  55   1          lcd12864_show_string(4, 2, "TL:");
-  56   1          DS1302_deInit();
-  57   1          
-  58   1          DS18B20_ConvertT();          // 上电先转换一次温度，防止第一次读数据错误
-  59   1          delay_ms(1000);               // 等待转换完成
-  60   1          THigh = AT24C02_ReadByte(0); // 读取温度阈值数据
-  61   1          TLow = AT24C02_ReadByte(1);
-  62   1          if (THigh > 100 || TLow < -10 || THigh <= TLow) {
-  63   2              THigh = 20; // 如果阈值非法，则设为默认值
-  64   2              TLow = 15;
-  65   2          }
-  66   1      
-  67   1          LCD_ShowSignedNum(2, 11, THigh, 2);
-  68   1          LCD_ShowSignedNum(2, 15, TLow, 2);
-  69   1          Timer0_Init();
-  70   1          while (1) {
-  71   2              KeyNum = Key();
-  72   2              /* 温度读取及显示 */
-  73   2              DS18B20_ConvertT();  // 转换温度
-  74   2              T = DS18B20_ReadT(); // 读取温度
-  75   2              if (T < 0)           // 如果温度小于0
-  76   2              {
-  77   3                  LCD_ShowChar(1, 1, '-'); // 显示负号
-  78   3                  TShow = -T;              // 将温度变为正数
-  79   3              } else                       // 如果温度大于等于0
-  80   2              {
-  81   3                  LCD_ShowChar(1, 1, '+'); // 显示正号
-  82   3                  TShow = T;
-  83   3              }
-  84   2              LCD_ShowNum(1, 2, TShow, 2);                              // 显示温度整数部分
-  85   2              LCD_ShowChar(1, 3, '.');                                  // 显示小数点
-  86   2              LCD_ShowNum(1, 4, (unsigned long)(TShow * 100) % 100, 2); // 显示温度小数部分
-  87   2      
-  88   2              // 计算华氏温度
-  89   2              F = (long)T * 18 / 10 + 32;
-  90   2              FInt = (unsigned int)(F);        // 整数部分
-  91   2              FFrac = (unsigned int)(F % 100); // 小数部分
-  92   2      
-  93   2              LCD_ShowNum(1, 6, FInt, 2);                                     // 显示华氏温度整数部分
-  94   2              LCD_ShowChar(1, 7, '.');                                        // 显示小数点
-  95   2              LCD_ShowNum(1, 8, (unsigned long)(T * 100) % 100 * 18 / 10, 2); // 显示华氏温度小数部分
-  96   2              /* 阈值判断及显示 */
-  97   2              if (KeyNum) {
-  98   3                  if (KeyNum == 1) // K1按键，THigh自增
-  99   3                  {
- 100   4                      THigh++;
- 101   4                      if (THigh > 100) {
- 102   5                          THigh = 100;
- 103   5                      }
- 104   4                  }
- 105   3                  if (KeyNum == 2) // K2按键，THigh自减
- 106   3                  {
- 107   4                      THigh--;
- 108   4                      if (THigh <= TLow) {
- 109   5                          THigh++;
- 110   5                      }
- 111   4                  }
- 112   3                  if (KeyNum == 3) // K3按键，TLow自增
- 113   3                  {
- 114   4                      lcd12864_init(); // LCD12864初始化
- 115   4                      TLow++;
- 116   4                      if (TLow >= THigh) {
-C51 COMPILER V9.60.0.0   MAIN                                                              12/27/2024 16:09:16 PAGE 3   
+  55   3            switch(GPIO_KEY)
+  56   3            {
+  57   4              case(0X70): KeyValue=KeyValue;break;
+  58   4              case(0Xb0): KeyValue=KeyValue+4;break;
+  59   4              case(0Xd0): KeyValue=KeyValue+8;break;
+  60   4              case(0Xe0): KeyValue=KeyValue+12;break;
+  61   4            }
+  62   3            
+  63   3          }
+  64   2        }
+  65   1        while((a<50)&&(GPIO_KEY!=0xf0))  //检测按键松手检测
+  66   1        {
+  67   2          delay(100);
+  68   2          a++;
+  69   2        }
+  70   1      }
+  71          
+  72          void Beep_Alert(unsigned int duration) // 蜂鸣器报警函数
+  73          {
+  74   1          unsigned int i;
+  75   1          for (i = 0; i < duration; i++) {
+  76   2              BEEP = !BEEP;   // 翻转蜂鸣器引脚
+  77   2              delay_10us(10); // 延时控制频率
+  78   2          }
+  79   1          BEEP = 0; // 关闭蜂鸣器
+  80   1      }
+  81          
+  82          void main() {
+  83   1          long F;
+  84   1          unsigned int FInt;  // 整数部分
+  85   1          unsigned int FFrac; // 小数部分
+  86   1          int start_time;
+  87   1          DS1302_Init();
+  88   1          DS1302_SetTime(); // 设置时间
+  89   1          start_time = 0;
+  90   1          lcd12864_init(); // LCD12864初始化
+  91   1      
+  92   1          lcd12864_show_string(1, 0, "数\xfd显温度计");
+  93   1          lcd12864_show_string(1, 1, "2021217934"); // 第4行字符串显示
+  94   1          while (start_time < 3000)                 // 执行3秒
+  95   1          {
+  96   2              DS1302_ReadTime(); // 读取时间
+  97   2              lcd12864_show_string(0, 2, "TIME:");
+  98   2              LCD_ShowNum(4, 6, DS1302_Time[3], 2); // 显示时
+  99   2              lcd12864_show_string(4, 2, ":");
+ 100   2              LCD_ShowNum(4, 9, DS1302_Time[4], 2); // 显示分
+ 101   2              lcd12864_show_string(6, 2, ":");
+ 102   2              LCD_ShowNum(4, 12, DS1302_Time[5], 2); // 显示秒
+ 103   2              delay_ms(100);                         // 每次延时100ms
+ 104   2              start_time += 100;                     // 增加计时器
+ 105   2          }
+ 106   1          lcd12864_init(); // LCD12864初始化
+ 107   1          delay_ms(1000);
+ 108   1          lcd12864_show_string(0, 2, "TH:");
+ 109   1          lcd12864_show_string(4, 2, "TL:");
+ 110   1          DS1302_deInit();
+ 111   1          
+ 112   1          DS18B20_ConvertT();          // 上电先转换一次温度，防止第一次读数据错误
+ 113   1          delay_ms(1000);               // 等待转换完成
+ 114   1          THigh = AT24C02_ReadByte(0); // 读取温度阈值数据
+ 115   1          TLow = AT24C02_ReadByte(1);
+ 116   1          if (THigh > 100 || TLow < -10 || THigh <= TLow) {
+C51 COMPILER V9.60.0.0   MAIN                                                              12/28/2024 11:59:12 PAGE 3   
 
- 117   5                          TLow--;
- 118   5                      }
- 119   4                  }
- 120   3                  if (KeyNum == 4) // K4按键，TLow自减
- 121   3                  {
- 122   4                      TLow--;
- 123   4                      if (TLow < -10) {
- 124   5                          TLow = -10;
- 125   5                      }
- 126   4                  }
- 127   3                  lcd12864_show_string(0, 2, "TH:");
- 128   3                  lcd12864_show_string(4, 2, "TL:");
- 129   3                  LCD_ShowSignedNum(2, 11, THigh, 2);
- 130   3                  LCD_ShowSignedNum(2, 15, TLow, 2);
- 131   3                  AT24C02_WriteByte(0, THigh); // 写入到At24C02中保存
- 132   3                  delay_ms(5);
- 133   3                  AT24C02_WriteByte(1, TLow);
- 134   3                  delay_ms(5);
- 135   3              }
- 136   2              lcd12864_show_string(0, 2, "TH:");
- 137   2              lcd12864_show_string(4, 2, "TL:");
- 138   2              LCD_ShowSignedNum(2, 11, THigh, 2);
- 139   2              LCD_ShowSignedNum(2, 15, TLow, 2);
- 140   2              if (T > THigh) // 温度越高
- 141   2              {
- 142   3                  // LCD_ShowString(1, 13, "OV:H");
- 143   3                  Beep_Alert(1000); // 蜂鸣器报警
- 144   3              } else if (T < TLow)  // 温度越低
- 145   2              {
- 146   3                  // LCD_ShowString(1, 13, "OV:L");
- 147   3                  Beep_Alert(1000); // 蜂鸣器报警
- 148   3              } else {
- 149   3                  // LCD_ShowString(1, 13, "    "); // 清除报警显示
- 150   3                  BEEP = 0; // 关闭蜂鸣器
- 151   3              }
- 152   2          }
- 153   1      }
- 154          
- 155          void Timer0_Routine() interrupt 1 {
- 156   1          static unsigned int T0Count;
- 157   1          TL0 = 0x18; // 设置定时初值
- 158   1          TH0 = 0xFC; // 设置定时初值
- 159   1          T0Count++;
- 160   1          if (T0Count >= 20) {
- 161   2              T0Count = 0;
- 162   2              Key_Loop(); // 每20ms调用一次按键驱动函数
- 163   2          }
- 164   1      }
+ 117   2              THigh = 20; // 如果阈值非法，则设为默认值
+ 118   2              TLow = 15;
+ 119   2          }
+ 120   1      
+ 121   1          LCD_ShowSignedNum(2, 11, THigh, 2);
+ 122   1          LCD_ShowSignedNum(2, 15, TLow, 2);
+ 123   1          Timer0_Init();
+ 124   1          while (1) {
+ 125   2              KeyNum = Key();
+ 126   2              KeyDown();       //按键判断函数
+ 127   2              /* 温度读取及显示 */
+ 128   2              DS18B20_ConvertT();  // 转换温度
+ 129   2              T = DS18B20_ReadT(); // 读取温度
+ 130   2              if (T < 0)           // 如果温度小于0
+ 131   2              {
+ 132   3                  LCD_ShowChar(1, 1, '-'); // 显示负号
+ 133   3                  TShow = -T;              // 将温度变为正数
+ 134   3              } else                       // 如果温度大于等于0
+ 135   2              {
+ 136   3                  LCD_ShowChar(1, 1, '+'); // 显示正号
+ 137   3                  TShow = T;
+ 138   3              }
+ 139   2              LCD_ShowNum(1, 2, TShow, 2);                              // 显示温度整数部分
+ 140   2              LCD_ShowChar(1, 3, '.');                                  // 显示小数点
+ 141   2              LCD_ShowNum(1, 4, (unsigned long)(TShow * 100) % 100, 2); // 显示温度小数部分
+ 142   2      
+ 143   2              // 计算华氏温度
+ 144   2              F = (long)T * 18 / 10 + 32;
+ 145   2              FInt = (unsigned int)(F);        // 整数部分
+ 146   2              FFrac = (unsigned int)(F % 100); // 小数部分
+ 147   2      
+ 148   2              LCD_ShowNum(1, 6, FInt, 2);                                     // 显示华氏温度整数部分
+ 149   2              LCD_ShowChar(1, 7, '.');                                        // 显示小数点
+ 150   2              LCD_ShowNum(1, 8, (unsigned long)(T * 100) % 100 * 18 / 10, 2); // 显示华氏温度小数部分
+ 151   2              /* 阈值判断及显示 */
+ 152   2              if (KeyNum) {
+ 153   3                  if (KeyNum == 1) // K1按键，THigh自增
+ 154   3                  {
+ 155   4                      THigh++;
+ 156   4                      if (THigh > 100) {
+ 157   5                          THigh = 100;
+ 158   5                      }
+ 159   4                  }
+ 160   3                  if (KeyNum == 2) // K2按键，THigh自减
+ 161   3                  {
+ 162   4                      THigh--;
+ 163   4                      if (THigh <= TLow) {
+ 164   5                          THigh++;
+ 165   5                      }
+ 166   4                  }
+ 167   3                  if (KeyNum == 3) // K3按键，TLow自增
+ 168   3                  {
+ 169   4                      lcd12864_init(); // LCD12864初始化
+ 170   4                      TLow++;
+ 171   4                      if (TLow >= THigh) {
+ 172   5                          TLow--;
+ 173   5                      }
+ 174   4                  }
+ 175   3                  if (KeyNum == 4) // K4按键，TLow自减
+ 176   3                  {
+ 177   4                      TLow--;
+ 178   4                      if (TLow < -10) {
+C51 COMPILER V9.60.0.0   MAIN                                                              12/28/2024 11:59:12 PAGE 4   
+
+ 179   5                          TLow = -10;
+ 180   5                      }
+ 181   4                  }
+ 182   3                  lcd12864_show_string(0, 2, "TH:");
+ 183   3                  lcd12864_show_string(4, 2, "TL:");
+ 184   3                  LCD_ShowSignedNum(2, 11, THigh, 2);
+ 185   3                  LCD_ShowSignedNum(2, 15, TLow, 2);
+ 186   3                  AT24C02_WriteByte(0, THigh); // 写入到At24C02中保存
+ 187   3                  delay_ms(5);
+ 188   3                  AT24C02_WriteByte(1, TLow);
+ 189   3                  delay_ms(5);
+ 190   3              }
+ 191   2              if(KeyValue){
+ 192   3                if(KeyValue==1){
+ 193   4                  if(TempCount < MAX_TEMP_RECORDS){
+ 194   5                    TempRecords[TempCount] = TShow;
+ 195   5                    TempCount++;
+ 196   5                    lcd12864_init();
+ 197   5                    lcd12864_show_string(0, 1, "Temperature");
+ 198   5                    lcd12864_show_string(0, 2, "Stored!");
+ 199   5                    delay_ms(2000);
+ 200   5                    lcd12864_init();
+ 201   5                    KeyValue = 0xFF;  // 清除按键值
+ 202   5                  }else{
+ 203   5                    lcd12864_init();
+ 204   5                    lcd12864_show_string(0, 1, "Storage Full!");
+ 205   5                    delay_ms(1000);
+ 206   5                    lcd12864_init();
+ 207   5                    KeyValue = 0xFF;  // 清除按键值
+ 208   5                  }
+ 209   4                }
+ 210   3                if(KeyValue==2){
+ 211   4                  lcd12864_init();
+ 212   4                  LCD_ShowNum(0, 0, TempRecords[0], 2);                                     // 显示华氏温度整数部分
+ 213   4                  LCD_ShowChar(0, 1, '.');                                        // 显示小数点
+ 214   4                  LCD_ShowNum(0, 2, (unsigned long)(TempRecords[0] * 100) % 100 * 18 / 10, 2); // 显示华氏温度小数部分
+ 215   4                  delay_ms(3000);
+ 216   4                  KeyValue = 0xFF;  // 清除按键值
+ 217   4                  lcd12864_init();
+ 218   4                  }
+ 219   3                if(KeyValue==3){
+ 220   4                  lcd12864_init();
+ 221   4                  LCD_ShowNum(0, 0, TempRecords[1], 2);                                     // 显示华氏温度整数部分
+ 222   4                  LCD_ShowChar(0, 1, '.');                                        // 显示小数点
+ 223   4                  LCD_ShowNum(0, 2, (unsigned long)(TempRecords[1] * 100) % 100 * 18 / 10, 2); // 显示华氏温度小数部分
+ 224   4                  delay_ms(3000);
+ 225   4                  KeyValue = 0xFF;  // 清除按键值
+ 226   4                  lcd12864_init();
+ 227   4                  }
+ 228   3                if(KeyValue==4){
+ 229   4                  lcd12864_init();
+ 230   4                  LCD_ShowNum(0, 0, TempRecords[2], 2);                                     // 显示华氏温度整数部分
+ 231   4                  LCD_ShowChar(0, 1, '.');                                        // 显示小数点
+ 232   4                  LCD_ShowNum(0, 2, (unsigned long)(TempRecords[2] * 100) % 100 * 18 / 10, 2); // 显示华氏温度小数部分
+ 233   4                  delay_ms(3000);
+ 234   4                  KeyValue = 0xFF;  // 清除按键值
+ 235   4                  lcd12864_init();
+ 236   4                  }
+ 237   3                if(KeyValue==5){
+ 238   4                  lcd12864_init();
+ 239   4                  LCD_ShowNum(0, 0, TempRecords[3], 2);                                     // 显示华氏温度整数部分
+ 240   4                  LCD_ShowChar(0, 1, '.');                                        // 显示小数点
+C51 COMPILER V9.60.0.0   MAIN                                                              12/28/2024 11:59:12 PAGE 5   
+
+ 241   4                  LCD_ShowNum(0, 2, (unsigned long)(TempRecords[3] * 100) % 100 * 18 / 10, 2); // 显示华氏温度小数部分
+ 242   4                  delay_ms(3000);
+ 243   4                  KeyValue = 0xFF;  // 清除按键值
+ 244   4                  lcd12864_init();
+ 245   4                  }
+ 246   3                if(KeyValue==6){
+ 247   4                  lcd12864_init();
+ 248   4                  LCD_ShowNum(0, 0, TempRecords[4], 2);                                     // 显示华氏温度整数部分
+ 249   4                  LCD_ShowChar(0, 1, '.');                                        // 显示小数点
+ 250   4                  LCD_ShowNum(0, 2, (unsigned long)(TempRecords[4] * 100) % 100 * 18 / 10, 2); // 显示华氏温度小数部分
+ 251   4                  delay_ms(3000);
+ 252   4                  KeyValue = 0xFF;  // 清除按键值
+ 253   4                  lcd12864_init();
+ 254   4                  }
+ 255   3              }
+ 256   2              lcd12864_show_string(0, 2, "TH:");
+ 257   2              lcd12864_show_string(4, 2, "TL:");
+ 258   2              LCD_ShowSignedNum(2, 11, THigh, 2);
+ 259   2              LCD_ShowSignedNum(2, 15, TLow, 2);
+ 260   2              if (T > THigh) // 温度越高
+ 261   2              {
+ 262   3                  // LCD_ShowString(1, 13, "OV:H");
+ 263   3                  Beep_Alert(1000); // 蜂鸣器报警
+ 264   3              } else if (T < TLow)  // 温度越低
+ 265   2              {
+ 266   3                  // LCD_ShowString(1, 13, "OV:L");
+ 267   3                  Beep_Alert(1000); // 蜂鸣器报警
+ 268   3              } else {
+ 269   3                  // LCD_ShowString(1, 13, "    "); // 清除报警显示
+ 270   3                  BEEP = 0; // 关闭蜂鸣器
+ 271   3              }
+ 272   2          }
+ 273   1      }
+ 274          
+ 275          void Timer0_Routine() interrupt 1 {
+ 276   1          static unsigned int T0Count;
+ 277   1          TL0 = 0x18; // 设置定时初值
+ 278   1          TH0 = 0xFC; // 设置定时初值
+ 279   1          T0Count++;
+ 280   1          if (T0Count >= 20) {
+ 281   2              T0Count = 0;
+ 282   2              Key_Loop(); // 每20ms调用一次按键驱动函数
+ 283   2          }
+ 284   1      }
 
 
 MODULE INFORMATION:   STATIC OVERLAYABLE
-   CODE SIZE        =   1107    ----
-   CONSTANT SIZE    =     38    ----
+   CODE SIZE        =   1982    ----
+   CONSTANT SIZE    =     89    ----
    XDATA SIZE       =   ----    ----
    PDATA SIZE       =   ----    ----
-   DATA SIZE        =     14      14
+   DATA SIZE        =     40      15
    IDATA SIZE       =   ----    ----
    BIT SIZE         =   ----    ----
 END OF MODULE INFORMATION.

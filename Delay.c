@@ -13,7 +13,10 @@ void delay_ms(unsigned int xms)
 		} while (--i);
 	}
 }
-
+void delay(unsigned int i)
+{
+	while(i--);	
+}
 void delay_10us(unsigned int ten_us) 
 {
     while (ten_us--);
